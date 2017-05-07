@@ -10,12 +10,74 @@ YAML|1|0|0|11
 --------|--------|--------|--------|--------
 SUM:|10|96|8|344
 
-## Main
+## Usage
+
+climate_control is loaded with `require 'climate_control'`. This makes the
+following ClimateControl.modify module method available.
+
+## Code
+
+
+### lib/climate_control.rb
 
 ```ruby
+require ["climate_control/environment"](#user-content-lib/climate_control/environment)
+require "climate_control/errors"
+require "climate_control/modifier"
+require "climate_control/version"
+
+module ClimateControl
+  @@env = ClimateControl::Environment.new
+
   def self.modify(environment_overrides, &block)
     Modifier.new(env, environment_overrides, &block).process
   end
+
+  def self.env
+    @@env
+  end
+end
+```
+
+## <a name="lib/climate_control/environment"></a>lib/climate_control/environment
+
+```ruby
+require ["thread"](https://ruby-doc.org/core-2.4.0/Thread.html)
+require ["forwardable"](https://ruby-doc.org/stdlib-2.4.0/libdoc/forwardable/rdoc/Forwardable.html)
+
+module ClimateControl
+  class Environment
+    extend Forwardable
+
+    def initialize
+      @semaphore = Mutex.new
+      @owner = nil
+    end
+
+    def_delegators :env, :[]=, :to_hash, :[], :delete
+
+    def synchronize
+      if @owner == Thread.current
+        return yield if block_given?
+      end
+
+      @semaphore.synchronize do
+        begin
+          @owner = Thread.current
+          yield if block_given?
+        ensure
+          @owner = nil
+        end
+      end
+    end
+
+    private
+
+    def env
+      ENV
+    end
+  end
+end
 ```
 
 ## Tests
